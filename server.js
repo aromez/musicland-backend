@@ -22,14 +22,35 @@ const PORT =
   process.env.PORT || 3000;
 
 // ============================================================
-// MIDDLEWARE
+// CORS
 // ============================================================
 
 app.use(
   cors({
     origin: '*',
+
+    methods: [
+      'GET',
+      'POST',
+      'PUT',
+      'PATCH',
+      'DELETE',
+      'OPTIONS',
+    ],
+
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+    ],
   })
 );
+
+// ============================================================
+// BODY PARSER
+// ============================================================
 
 app.use(
   express.json({
@@ -37,38 +58,117 @@ app.use(
   })
 );
 
+app.use(
+  express.urlencoded({
+    extended: true,
+  })
+);
+
+// ============================================================
+// REQUEST LOGGER
+// ============================================================
+
+app.use(
+  (req, res, next) => {
+
+    const start =
+      Date.now();
+
+    console.log(
+      `➡️ ${req.method} ${req.originalUrl}`
+    );
+
+    res.on(
+      'finish',
+      () => {
+
+        const duration =
+          Date.now() - start;
+
+        console.log(
+          `⬅️ ${req.method} ${req.originalUrl} ` +
+          `${res.statusCode} - ${duration}ms`
+        );
+      }
+    );
+
+    next();
+  }
+);
+
 // ============================================================
 // ROOT
 // ============================================================
 
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message:
-      'MusicLand Backend API inafanya kazi 🎵',
-    environment:
-      process.env.NODE_ENV ||
-      'development',
-  });
-});
+app.get(
+  '/',
+  (req, res) => {
+
+    res.status(200).json({
+
+      success: true,
+
+      message:
+        'MusicLand Backend API inafanya kazi 🎵',
+
+      environment:
+        process.env.NODE_ENV ||
+        'development',
+
+      timestamp:
+        new Date().toISOString(),
+    });
+  }
+);
 
 // ============================================================
-// HEALTH CHECK
+// HEALTH
 // ============================================================
 
-app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    status: 'ok',
-    service:
-      'musicland-backend',
-    time:
-      new Date().toISOString(),
-  });
-});
+app.get(
+  '/health',
+  (req, res) => {
+
+    res.status(200).json({
+
+      success: true,
+
+      status: 'ok',
+
+      service:
+        'musicland-backend',
+
+      timestamp:
+        new Date().toISOString(),
+    });
+  }
+);
 
 // ============================================================
-// API ROUTES
+// API HEALTH
+// ============================================================
+
+app.get(
+  '/api/health',
+  (req, res) => {
+
+    res.status(200).json({
+
+      success: true,
+
+      status: 'ok',
+
+      service:
+        'musicland-backend',
+
+      timestamp:
+        new Date().toISOString(),
+    });
+  }
+);
+
+// ============================================================
+// MUSIC ROUTES
 // ============================================================
 
 app.use(
@@ -76,26 +176,81 @@ app.use(
   musicRoutes
 );
 
+// ============================================================
+// AUTH ROUTES
+// ============================================================
+
 app.use(
   '/api/auth',
   authRoutes
 );
 
 // ============================================================
-// ERROR HANDLER
+// 404
+// ============================================================
+
+app.use(
+  (req, res) => {
+
+    console.log(
+      `❌ 404: ${req.method} ${req.originalUrl}`
+    );
+
+    res.status(404).json({
+
+      success: false,
+
+      error:
+        'Route haijapatikana',
+
+      path:
+        req.originalUrl,
+
+      method:
+        req.method,
+    });
+  }
+);
+
+// ============================================================
+// GLOBAL ERROR HANDLER
 // ============================================================
 
 app.use(
   (err, req, res, next) => {
+
     console.error(
-      '❌ GLOBAL ERROR:',
+      '========================================'
+    );
+
+    console.error(
+      '❌ GLOBAL SERVER ERROR'
+    );
+
+    console.error(
       err
     );
 
+    console.error(
+      '========================================'
+    );
+
+    if (res.headersSent) {
+      return next(err);
+    }
+
     res.status(500).json({
+
       success: false,
-      message:
+
+      error:
         'Internal server error',
+
+      message:
+        process.env.NODE_ENV ===
+        'development'
+          ? err.message
+          : 'Server imepata hitilafu',
     });
   }
 );
@@ -104,7 +259,21 @@ app.use(
 // CACHE CLEANUP
 // ============================================================
 
-cache.startCleanup(300);
+try {
+
+  cache.startCleanup(300);
+
+  console.log(
+    '✅ Cache cleanup imeanzishwa'
+  );
+
+} catch (error) {
+
+  console.error(
+    '⚠️ Cache cleanup haikuanza:',
+    error.message
+  );
+}
 
 // ============================================================
 // START SERVER
@@ -116,11 +285,15 @@ app.listen(
   async () => {
 
     console.log(
-      '=========================================='
+      '========================================'
     );
 
     console.log(
       '🎵 MusicLand Backend'
+    );
+
+    console.log(
+      '========================================'
     );
 
     console.log(
@@ -143,7 +316,15 @@ app.listen(
     );
 
     console.log(
-      `🔐 JWT configured: ${
+      `🔐 Gmail App Password: ${
+        process.env.GMAIL_APP_PASSWORD
+          ? 'YES'
+          : 'NO'
+      }`
+    );
+
+    console.log(
+      `🔑 JWT configured: ${
         process.env.JWT_SECRET
           ? 'YES'
           : 'NO'
@@ -151,12 +332,18 @@ app.listen(
     );
 
     console.log(
-      '=========================================='
+      `🕐 Started: ${
+        new Date().toISOString()
+      }`
     );
 
-    // ========================================================
-    // TEST GMAIL SMTP
-    // ========================================================
+    console.log(
+      '========================================'
+    );
+
+    // --------------------------------------------------------
+    // VERIFY GMAIL
+    // --------------------------------------------------------
 
     await verifyEmailTransporter();
   }
