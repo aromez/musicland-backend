@@ -1,17 +1,62 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
-if (!RESEND_API_KEY) {
-  console.warn('⚠️ RESEND_API_KEY haijawekwa kwenye environment');
+if (!GMAIL_USER) {
+  console.warn('⚠️ GMAIL_USER haijawekwa kwenye environment');
 }
 
-const resend = new Resend(RESEND_API_KEY);
+if (!GMAIL_APP_PASSWORD) {
+  console.warn('⚠️ GMAIL_APP_PASSWORD haijawekwa kwenye environment');
+}
 
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+
+  auth: {
+    user: GMAIL_USER,
+    pass: GMAIL_APP_PASSWORD,
+  },
+
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 20000,
+});
+
+/**
+ * Verify Gmail SMTP connection
+ */
+async function verifyEmailTransporter() {
+  try {
+    await transporter.verify();
+
+    console.log('✅ Gmail SMTP connection iko tayari');
+
+    return true;
+  } catch (error) {
+    console.error(
+      '❌ Gmail SMTP connection failed:',
+      error.message
+    );
+
+    return false;
+  }
+}
+
+/**
+ * Send OTP email
+ */
 async function sendOtpEmail(email, code) {
-  if (!RESEND_API_KEY) {
+  if (!GMAIL_USER) {
     throw new Error(
-      'RESEND_API_KEY haijawekwa kwenye environment'
+      'GMAIL_USER haijawekwa kwenye environment'
+    );
+  }
+
+  if (!GMAIL_APP_PASSWORD) {
+    throw new Error(
+      'GMAIL_APP_PASSWORD haijawekwa kwenye environment'
     );
   }
 
@@ -24,21 +69,22 @@ async function sendOtpEmail(email, code) {
   }
 
   const mailOptions = {
-    from:
-      process.env.RESEND_FROM_EMAIL ||
-      'MusicLand <onboarding@resend.dev>',
+    from: `"MusicLand" <${GMAIL_USER}>`,
 
-    to: [email],
+    to: email,
 
     subject: 'MusicLand - Code ya Uthibitisho',
 
     html: `
       <!DOCTYPE html>
-      <html>
+      <html lang="sw">
+
       <head>
         <meta charset="UTF-8">
-        <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0"
+        >
 
         <title>MusicLand OTP</title>
       </head>
@@ -47,7 +93,7 @@ async function sendOtpEmail(email, code) {
         margin:0;
         padding:0;
         background:#0D0D0F;
-        font-family:Arial,sans-serif;
+        font-family:Arial,Helvetica,sans-serif;
       ">
 
         <div style="
@@ -61,7 +107,7 @@ async function sendOtpEmail(email, code) {
 
           <h2 style="
             color:#1ED760;
-            margin-bottom:20px;
+            margin:0 0 20px 0;
           ">
             MusicLand 🎵
           </h2>
@@ -71,7 +117,7 @@ async function sendOtpEmail(email, code) {
           </p>
 
           <p>
-            Tumia code hii kuthibitisha akaunti yako:
+            Tumia code hii kuthibitisha akaunti yako ya MusicLand:
           </p>
 
           <div style="
@@ -99,6 +145,20 @@ async function sendOtpEmail(email, code) {
             email hii.
           </p>
 
+          <hr style="
+            border:0;
+            border-top:1px solid #292929;
+            margin:30px 0;
+          ">
+
+          <p style="
+            color:#666666;
+            font-size:11px;
+            text-align:center;
+          ">
+            © MusicLand
+          </p>
+
         </div>
 
       </body>
@@ -108,32 +168,21 @@ async function sendOtpEmail(email, code) {
 
   try {
     console.log(
-      `📧 Inatuma OTP email kwa ${email} kupitia Resend...`
+      `📧 Inatuma OTP email kwa ${email} kupitia Gmail...`
     );
 
-    const { data, error } =
-      await resend.emails.send(mailOptions);
-
-    if (error) {
-      console.error(
-        '❌ Resend API error:',
-        error
-      );
-
-      throw new Error(
-        error.message || 'Resend imeshindwa kutuma email'
-      );
-    }
+    const info = await transporter.sendMail(mailOptions);
 
     console.log(
       `✅ OTP email imetumwa kwa ${email}`
     );
 
     console.log(
-      `📨 Resend Message ID: ${data?.id || 'unknown'}`
+      `📨 Message ID: ${info.messageId}`
     );
 
-    return data;
+    return info;
+
   } catch (error) {
     console.error(
       `❌ OTP email imeshindikana kwa ${email}:`,
@@ -148,4 +197,5 @@ async function sendOtpEmail(email, code) {
 
 module.exports = {
   sendOtpEmail,
+  verifyEmailTransporter,
 };
