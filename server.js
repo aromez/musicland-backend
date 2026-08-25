@@ -6,7 +6,6 @@ const cors = require('cors');
 const musicRoutes = require('./routes/musicRoutes');
 const authRoutes = require('./routes/authRoutes');
 const cache = require('./services/cacheService');
-const { verifyEmailTransporter } = require('./services/emailService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +20,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5000',
   'http://localhost:8080',
+  'https://musicland-backend-1.onrender.com',
 ];
 
 app.use(cors({
@@ -173,20 +173,19 @@ try {
 // START SERVER
 // ============================================================
 
-app.listen(PORT, '0.0.0.0', async () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log('========================================');
   console.log('🎵 MusicLand Backend');
   console.log('========================================');
   console.log(`🚀 Server inaendesha kwenye port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📧 Brevo configured: ${process.env.BREVO_API_KEY ? 'YES' : 'NO'}`);
-  console.log(`🔐 Brevo From Email: ${process.env.BREVO_FROM_EMAIL || 'NOT SET'}`);
-  console.log(`🔑 JWT configured: ${process.env.JWT_SECRET ? 'YES' : 'NO'}`);
+  console.log(`🔓 Email Service: DISABLED (Development Mode)`);
+  console.log(`🔑 JWT Secret: ${process.env.JWT_SECRET ? '✅ SET' : '❌ NOT SET'}`);
   console.log(`🕐 Started: ${new Date().toISOString()}`);
   console.log('========================================');
-
-  // Verify Brevo configuration
-  await verifyEmailTransporter();
+  console.log('💡 OTP Codes will be logged in console');
+  console.log('💡 Use any 6-digit code for verification');
+  console.log('========================================');
 });
 
 // ============================================================
@@ -205,8 +204,10 @@ process.on('SIGINT', () => {
 
 process.on('uncaughtException', (error) => {
   console.error('💥 Uncaught Exception:', error);
+  // Don't exit, keep server running
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('💥 Unhandled Rejection:', reason);
+  // Don't exit, keep server running
 });

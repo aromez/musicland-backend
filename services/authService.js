@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 const db = require('./database');
-const { sendOtpEmail } = require('./emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'musicland_dev_secret_badilisha_hii';
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
@@ -17,7 +16,7 @@ function isEmail(value) {
 }
 
 // ============================================================
-// REQUEST OTP
+// REQUEST OTP - DEVELOPMENT MODE (NO EMAIL)
 // ============================================================
 
 async function requestOtp({ email, phone }) {
@@ -35,15 +34,18 @@ async function requestOtp({ email, phone }) {
     throw new Error('Email uliyoingiza si sahihi');
   }
 
+  // Generate OTP
   const code = generateOtp();
   const expiresAt = Date.now() + OTP_EXPIRY_MS;
 
-  console.log(`🔐 OTP generated for ${contact}`);
+  console.log('========================================');
+  console.log('📧 DEVELOPMENT MODE - OTP GENERATED');
+  console.log(`👤 Contact: ${contact}`);
+  console.log(`🔑 OTP Code: ${code}`);
+  console.log(`⏰ Expires: ${new Date(expiresAt).toISOString()}`);
+  console.log('========================================');
 
-  // ==========================================================
-  // SAVE OTP
-  // ==========================================================
-
+  // Save OTP to database
   db.prepare(`
     INSERT INTO otp_codes (contact, code, expires_at)
     VALUES (?, ?, ?)
@@ -53,56 +55,46 @@ async function requestOtp({ email, phone }) {
       expires_at = excluded.expires_at
   `).run(contact, code, expiresAt);
 
-  // ==========================================================
-  // SEND EMAIL
-  // ==========================================================
-
-  if (email) {
-    try {
-      await sendOtpEmail(email, code);
-      console.log(`✅ OTP sent successfully to ${email}`);
-    } catch (error) {
-      // Rollback OTP if email fails
-      db.prepare('DELETE FROM otp_codes WHERE contact = ?').run(contact);
-      console.error(`❌ Failed sending OTP to ${email}:`, error.message);
-      throw new Error('Imeshindikana kutuma OTP kwenye email. Jaribu tena.');
-    }
-  }
-
-  return { contact };
+  // Return success without sending email
+  return {
+    contact,
+    devMode: true,
+    message: 'OTP generated (check server logs for code)'
+  };
 }
 
 // ============================================================
-// VERIFY OTP
+// VERIFY OTP - DEVELOPMENT MODE (ACCEPT ANY CODE)
 // ============================================================
 
 function verifyOtp({ contact, code }) {
+  // DEVELOPMENT MODE - Auto-verify
+  console.log('🔓 DEVELOPMENT MODE: Auto-verifying OTP');
+  console.log(`👤 Contact: ${contact}`);
+  console.log(`🔑 Code provided: ${code}`);
+
+  // Check if OTP exists in database
   const row = db
     .prepare('SELECT * FROM otp_codes WHERE contact = ?')
     .get(contact);
 
   if (!row) {
-    throw new Error('Hakuna code iliyotumwa kwa hii email');
-  }
-
-  if (row.expires_at < Date.now()) {
+    console.log('⚠️ No OTP found in database, generating temp token anyway');
+  } else {
+    console.log(`✅ OTP found in database: ${row.code}`);
+    // Delete OTP after verification
     db.prepare('DELETE FROM otp_codes WHERE contact = ?').run(contact);
-    throw new Error('Code imeisha muda, omba code mpya');
   }
 
-  if (row.code !== code) {
-    throw new Error('Code si sahihi');
-  }
-
-  // Delete OTP after successful verification
-  db.prepare('DELETE FROM otp_codes WHERE contact = ?').run(contact);
-
+  // Generate temp token
   const tempToken = jwt.sign(
     { contact, purpose: 'setup-profile' },
     JWT_SECRET,
     { expiresIn: '15m' }
   );
 
+  console.log(`✅ Temp token generated for ${contact}`);
+  
   return { tempToken };
 }
 
@@ -161,6 +153,8 @@ function setupProfile({ tempToken, username, password }) {
   );
 
   const token = jwt.sign({ userId: id }, JWT_SECRET, { expiresIn: '30d' });
+
+  console.log(`✅ User registered: ${username} (${contact})`);
 
   return {
     token,
