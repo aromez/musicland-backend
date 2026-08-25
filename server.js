@@ -9,33 +9,41 @@ const cache = require('./services/cacheService');
 
 const app = express();
 
+// Render provides PORT through environment variables
 const PORT = process.env.PORT || 3000;
+
+// ============================================================
+// BASIC APP SETTINGS
+// ============================================================
+
+app.disable('x-powered-by');
 
 // ============================================================
 // CORS
 // ============================================================
 
-app.use(
-  cors({
-    origin: true,
-    credentials: false,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'Accept',
-      'Origin',
-      'X-Requested-With',
-    ],
-  })
-);
+const corsOptions = {
+  origin: true,
+  credentials: false,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Accept',
+    'Origin',
+    'X-Requested-With',
+  ],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
 
 // ============================================================
 // BODY PARSER
 // ============================================================
 
 app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // ============================================================
 // REQUEST LOGGER
@@ -44,9 +52,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
   const start = Date.now();
 
+  console.log(`[REQUEST] ${req.method} ${req.originalUrl}`);
+
   res.on('finish', () => {
     const duration = Date.now() - start;
-
     console.log(
       `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`
     );
@@ -82,7 +91,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// API HEALTH
+// API HEALTH CHECK
 // ============================================================
 
 app.get('/api/health', (req, res) => {
@@ -95,11 +104,13 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============================================================
-// ROUTES
+// API ROUTES
 // ============================================================
 
+// Music routes
 app.use('/api', musicRoutes);
 
+// Authentication routes
 app.use('/api/auth', authRoutes);
 
 // ============================================================
@@ -107,15 +118,14 @@ app.use('/api/auth', authRoutes);
 // ============================================================
 
 app.use((req, res) => {
-  console.log(
-    `404 - Route haijapatikana: ${req.method} ${req.originalUrl}`
-  );
+  console.log(`[404] ${req.method} ${req.originalUrl}`);
 
   res.status(404).json({
     success: false,
     error: 'Route haijapatikana',
     path: req.originalUrl,
     method: req.method,
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -133,13 +143,13 @@ app.use((err, req, res, next) => {
     return next(err);
   }
 
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
   res.status(500).json({
     success: false,
     error: 'Internal server error',
-    message:
-      process.env.NODE_ENV === 'development'
-        ? err.message
-        : 'Server imepata hitilafu',
+    message: isDevelopment ? err.message : 'Server imepata hitilafu',
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -148,13 +158,14 @@ app.use((err, req, res, next) => {
 // ============================================================
 
 try {
-  cache.startCleanup(300);
-  console.log('✅ Cache cleanup imeanzishwa');
+  if (cache && typeof cache.startCleanup === 'function') {
+    cache.startCleanup(300);
+    console.log('✅ Cache cleanup imeanzishwa');
+  } else {
+    console.log('⚠️ Cache service haipatikani au haina startCleanup');
+  }
 } catch (error) {
-  console.error(
-    '⚠️ Cache cleanup haikuanza:',
-    error.message
-  );
+  console.error('⚠️ Cache cleanup haikuanza:', error.message);
 }
 
 // ============================================================
@@ -169,4 +180,28 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'production'}`);
   console.log(`🕐 Started: ${new Date().toISOString()}`);
   console.log('========================================');
+});
+
+// ============================================================
+// GRACEFUL SHUTDOWN
+// ============================================================
+
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received. Closing server...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received. Closing server...');
+  process.exit(0);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('💥 Uncaught Exception:', error);
+  // Keep server running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  // Keep server running
 });
