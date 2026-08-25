@@ -19,14 +19,7 @@ app.use(
   cors({
     origin: true,
     credentials: false,
-    methods: [
-      'GET',
-      'POST',
-      'PUT',
-      'PATCH',
-      'DELETE',
-      'OPTIONS',
-    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
@@ -37,26 +30,27 @@ app.use(
   })
 );
 
-
-
 // ============================================================
 // BODY PARSER
 // ============================================================
 
-app.use(
-  express.json({
-    limit: '2mb',
-  })
-);
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // ============================================================
 // REQUEST LOGGER
 // ============================================================
 
 app.use((req, res, next) => {
-  console.log(
-    `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`
-  );
+  const start = Date.now();
+
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+
+    console.log(
+      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`
+    );
+  });
 
   next();
 });
@@ -69,14 +63,13 @@ app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'MusicLand Backend API inafanya kazi 🎵',
-    environment:
-      process.env.NODE_ENV || 'development',
+    environment: process.env.NODE_ENV || 'production',
     timestamp: new Date().toISOString(),
   });
 });
 
 // ============================================================
-// HEALTH
+// HEALTH CHECK
 // ============================================================
 
 app.get('/health', (req, res) => {
@@ -89,7 +82,20 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// API ROUTES
+// API HEALTH
+// ============================================================
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: 'ok',
+    service: 'musicland-backend',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ============================================================
+// ROUTES
 // ============================================================
 
 app.use('/api', musicRoutes);
@@ -107,25 +113,33 @@ app.use((req, res) => {
 
   res.status(404).json({
     success: false,
-    message: 'Route haijapatikana',
+    error: 'Route haijapatikana',
     path: req.originalUrl,
+    method: req.method,
   });
 });
 
 // ============================================================
-// ERROR HANDLER
+// GLOBAL ERROR HANDLER
 // ============================================================
 
 app.use((err, req, res, next) => {
-  console.error('SERVER ERROR:', err);
+  console.error('========================================');
+  console.error('GLOBAL SERVER ERROR');
+  console.error(err);
+  console.error('========================================');
+
+  if (res.headersSent) {
+    return next(err);
+  }
 
   res.status(500).json({
     success: false,
-    message: 'Internal server error',
-    error:
+    error: 'Internal server error',
+    message:
       process.env.NODE_ENV === 'development'
         ? err.message
-        : undefined,
+        : 'Server imepata hitilafu',
   });
 });
 
@@ -133,24 +147,26 @@ app.use((err, req, res, next) => {
 // CACHE CLEANUP
 // ============================================================
 
-cache.startCleanup(300);
+try {
+  cache.startCleanup(300);
+  console.log('✅ Cache cleanup imeanzishwa');
+} catch (error) {
+  console.error(
+    '⚠️ Cache cleanup haikuanza:',
+    error.message
+  );
+}
 
 // ============================================================
 // START SERVER
 // ============================================================
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(
-    `🎵 MusicLand Backend inaendesha kwenye port ${PORT}`
-  );
-
-  console.log(
-    `🌐 PORT: ${PORT}`
-  );
-
-  console.log(
-    `🚀 Environment: ${
-      process.env.NODE_ENV || 'development'
-    }`
-  );
+  console.log('========================================');
+  console.log('🎵 MusicLand Backend');
+  console.log('========================================');
+  console.log(`🚀 Server inaendesha kwenye port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'production'}`);
+  console.log(`🕐 Started: ${new Date().toISOString()}`);
+  console.log('========================================');
 });
