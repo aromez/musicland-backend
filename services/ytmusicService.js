@@ -1,12 +1,26 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-const PYTHON_BIN = path.join(__dirname, '..', 'python', 'venv', 'bin', 'python3');
-const SCRIPT_PATH = path.join(__dirname, '..', 'python', 'ytmusic_lookup.py');
+const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
+const SCRIPT_PATH = path.join(
+  __dirname,
+  '..',
+  'python',
+  'ytmusic_lookup.py'
+);
 
 function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(PYTHON_BIN, [SCRIPT_PATH, ...args]);
+    const proc = spawn(
+      PYTHON_BIN,
+      [SCRIPT_PATH, ...args],
+      {
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: '1',
+        },
+      }
+    );
 
     let output = '';
     let errorOutput = '';
@@ -19,18 +33,37 @@ function runPythonCommand(args) {
       errorOutput += data.toString();
     });
 
+    proc.on('error', (error) => {
+      reject(
+        new Error(
+          `Imeshindikana kuanzisha Python: ${error.message}`
+        )
+      );
+    });
+
     proc.on('close', (code) => {
       if (code !== 0) {
-        return reject(new Error(`Python process ilitoka na code ${code}: ${errorOutput}`));
+        return reject(
+          new Error(
+            `Python process ilitoka na code ${code}: ${errorOutput}`
+          )
+        );
       }
+
       try {
         const parsed = JSON.parse(output);
+
         if (parsed.error) {
           return reject(new Error(parsed.error));
         }
+
         resolve(parsed);
       } catch (e) {
-        reject(new Error(`Imeshindikana ku-parse output ya Python: ${e.message}`));
+        reject(
+          new Error(
+            `Imeshindikana ku-parse output ya Python: ${e.message}`
+          )
+        );
       }
     });
   });
@@ -42,7 +75,11 @@ async function getTrending() {
 
 async function search(query, filterType = null) {
   const args = ['search', query];
-  if (filterType) args.push(filterType);
+
+  if (filterType) {
+    args.push(filterType);
+  }
+
   return runPythonCommand(args);
 }
 

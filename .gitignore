@@ -1,1 +1,7 @@
+node_modules/
+python/venv/
+.env
 musicland.db
+__pycache__/
+*.pyc
+npm-debug.log*
