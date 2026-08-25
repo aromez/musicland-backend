@@ -5,3 +5,7 @@ musicland.db
 __pycache__/
 *.pyc
 npm-debug.log*
+.env
+python/venv/
+__pycache__/
+*.pyc
