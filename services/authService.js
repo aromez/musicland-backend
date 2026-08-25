@@ -16,7 +16,7 @@ function isEmail(value) {
 }
 
 // ============================================================
-// REQUEST OTP - DEVELOPMENT MODE (NO EMAIL)
+// REQUEST OTP - NO EMAIL (Development Mode)
 // ============================================================
 
 async function requestOtp({ email, phone }) {
@@ -38,11 +38,18 @@ async function requestOtp({ email, phone }) {
   const code = generateOtp();
   const expiresAt = Date.now() + OTP_EXPIRY_MS;
 
+  // ==========================================================
+  // LOG OTP TO CONSOLE (NO EMAIL)
+  // ==========================================================
+  
   console.log('========================================');
-  console.log('📧 DEVELOPMENT MODE - OTP GENERATED');
+  console.log('📧 OTP GENERATED - DEVELOPMENT MODE');
+  console.log('========================================');
   console.log(`👤 Contact: ${contact}`);
   console.log(`🔑 OTP Code: ${code}`);
   console.log(`⏰ Expires: ${new Date(expiresAt).toISOString()}`);
+  console.log('========================================');
+  console.log('💡 Use this code to verify your account');
   console.log('========================================');
 
   // Save OTP to database
@@ -59,32 +66,41 @@ async function requestOtp({ email, phone }) {
   return {
     contact,
     devMode: true,
-    message: 'OTP generated (check server logs for code)'
+    message: 'OTP generated. Check server logs for the code.'
   };
 }
 
 // ============================================================
-// VERIFY OTP - DEVELOPMENT MODE (ACCEPT ANY CODE)
+// VERIFY OTP - Accepts any 6-digit code in dev mode
 // ============================================================
 
 function verifyOtp({ contact, code }) {
-  // DEVELOPMENT MODE - Auto-verify
-  console.log('🔓 DEVELOPMENT MODE: Auto-verifying OTP');
-  console.log(`👤 Contact: ${contact}`);
-  console.log(`🔑 Code provided: ${code}`);
-
-  // Check if OTP exists in database
+  // DEVELOPMENT MODE - Check database for OTP
   const row = db
     .prepare('SELECT * FROM otp_codes WHERE contact = ?')
     .get(contact);
 
   if (!row) {
-    console.log('⚠️ No OTP found in database, generating temp token anyway');
-  } else {
-    console.log(`✅ OTP found in database: ${row.code}`);
-    // Delete OTP after verification
-    db.prepare('DELETE FROM otp_codes WHERE contact = ?').run(contact);
+    console.log(`⚠️ No OTP found for ${contact}`);
+    throw new Error('Hakuna code iliyotumwa kwa hii email. Omba code mpya.');
   }
+
+  // Check if OTP expired
+  if (row.expires_at < Date.now()) {
+    db.prepare('DELETE FROM otp_codes WHERE contact = ?').run(contact);
+    throw new Error('Code imeisha muda, omba code mpya');
+  }
+
+  // Verify OTP
+  if (row.code !== code) {
+    console.log(`❌ Invalid OTP for ${contact}: ${code} (expected: ${row.code})`);
+    throw new Error('Code si sahihi');
+  }
+
+  console.log(`✅ OTP verified for ${contact}`);
+
+  // Delete OTP after successful verification
+  db.prepare('DELETE FROM otp_codes WHERE contact = ?').run(contact);
 
   // Generate temp token
   const tempToken = jwt.sign(
@@ -93,8 +109,6 @@ function verifyOtp({ contact, code }) {
     { expiresIn: '15m' }
   );
 
-  console.log(`✅ Temp token generated for ${contact}`);
-  
   return { tempToken };
 }
 
@@ -117,6 +131,7 @@ function setupProfile({ tempToken, username, password }) {
 
   const contact = decoded.contact;
 
+  // Check if user already exists
   const existing = db.prepare(`
     SELECT * FROM users
     WHERE email = ? OR phone = ?
@@ -138,6 +153,7 @@ function setupProfile({ tempToken, username, password }) {
   const id = crypto.randomUUID();
   const isEmailContact = isEmail(contact);
 
+  // Insert user
   db.prepare(`
     INSERT INTO users (
       id, email, phone, username, password_hash, avatar_url, created_at
@@ -152,6 +168,7 @@ function setupProfile({ tempToken, username, password }) {
     Date.now()
   );
 
+  // Generate JWT token
   const token = jwt.sign({ userId: id }, JWT_SECRET, { expiresIn: '30d' });
 
   console.log(`✅ User registered: ${username} (${contact})`);

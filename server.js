@@ -14,28 +14,8 @@ const PORT = process.env.PORT || 3000;
 // CORS
 // ============================================================
 
-// Allow requests from your Flutter app and frontend
-const allowedOrigins = [
-  'https://musicland-frontend.onrender.com',
-  'http://localhost:3000',
-  'http://localhost:5000',
-  'http://localhost:8080',
-  'https://musicland-backend-1.onrender.com',
-];
-
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      console.log('❌ CORS blocked:', origin);
-      callback(new Error('CORS policy violation'));
-    }
-  },
-  credentials: false,
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   optionsSuccessStatus: 204,
@@ -54,7 +34,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
   const start = Date.now();
-
   console.log(`➡️ ${req.method} ${req.originalUrl}`);
 
   res.on('finish', () => {
@@ -179,12 +158,12 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('========================================');
   console.log(`🚀 Server inaendesha kwenye port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔓 Email Service: DISABLED (Development Mode)`);
+  console.log(`🔓 Email Service: DISABLED`);
   console.log(`🔑 JWT Secret: ${process.env.JWT_SECRET ? '✅ SET' : '❌ NOT SET'}`);
   console.log(`🕐 Started: ${new Date().toISOString()}`);
   console.log('========================================');
-  console.log('💡 OTP Codes will be logged in console');
-  console.log('💡 Use any 6-digit code for verification');
+  console.log('💡 OTP Codes will be shown in console');
+  console.log('💡 Check logs for OTP code');
   console.log('========================================');
 });
 
@@ -204,10 +183,8 @@ process.on('SIGINT', () => {
 
 process.on('uncaughtException', (error) => {
   console.error('💥 Uncaught Exception:', error);
-  // Don't exit, keep server running
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('💥 Unhandled Rejection:', reason);
-  // Don't exit, keep server running
 });
