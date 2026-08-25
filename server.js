@@ -3,33 +3,46 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-const musicRoutes =
-  require('./routes/musicRoutes');
-
-const authRoutes =
-  require('./routes/authRoutes');
-
-const cache =
-  require('./services/cacheService');
-
-const {
-  verifyEmailTransporter,
-} = require('./services/emailService');
+const musicRoutes = require('./routes/musicRoutes');
+const authRoutes = require('./routes/authRoutes');
+const cache = require('./services/cacheService');
 
 const app = express();
 
-const PORT =
-  process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 // ============================================================
-// MIDDLEWARE
+// CORS
 // ============================================================
 
 app.use(
   cors({
-    origin: '*',
+    origin: true,
+    credentials: false,
+    methods: [
+      'GET',
+      'POST',
+      'PUT',
+      'PATCH',
+      'DELETE',
+      'OPTIONS',
+    ],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+    ],
   })
 );
+
+// Handle browser preflight requests
+app.options('*', cors());
+
+// ============================================================
+// BODY PARSER
+// ============================================================
 
 app.use(
   express.json({
@@ -38,32 +51,41 @@ app.use(
 );
 
 // ============================================================
+// REQUEST LOGGER
+// ============================================================
+
+app.use((req, res, next) => {
+  console.log(
+    `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`
+  );
+
+  next();
+});
+
+// ============================================================
 // ROOT
 // ============================================================
 
 app.get('/', (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
-    message:
-      'MusicLand Backend API inafanya kazi 🎵',
+    message: 'MusicLand Backend API inafanya kazi 🎵',
     environment:
-      process.env.NODE_ENV ||
-      'development',
+      process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
   });
 });
 
 // ============================================================
-// HEALTH CHECK
+// HEALTH
 // ============================================================
 
 app.get('/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     status: 'ok',
-    service:
-      'musicland-backend',
-    time:
-      new Date().toISOString(),
+    service: 'musicland-backend',
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -71,34 +93,42 @@ app.get('/health', (req, res) => {
 // API ROUTES
 // ============================================================
 
-app.use(
-  '/api',
-  musicRoutes
-);
+app.use('/api', musicRoutes);
 
-app.use(
-  '/api/auth',
-  authRoutes
-);
+app.use('/api/auth', authRoutes);
+
+// ============================================================
+// 404 HANDLER
+// ============================================================
+
+app.use((req, res) => {
+  console.log(
+    `404 - Route haijapatikana: ${req.method} ${req.originalUrl}`
+  );
+
+  res.status(404).json({
+    success: false,
+    message: 'Route haijapatikana',
+    path: req.originalUrl,
+  });
+});
 
 // ============================================================
 // ERROR HANDLER
 // ============================================================
 
-app.use(
-  (err, req, res, next) => {
-    console.error(
-      '❌ GLOBAL ERROR:',
-      err
-    );
+app.use((err, req, res, next) => {
+  console.error('SERVER ERROR:', err);
 
-    res.status(500).json({
-      success: false,
-      message:
-        'Internal server error',
-    });
-  }
-);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error:
+      process.env.NODE_ENV === 'development'
+        ? err.message
+        : undefined,
+  });
+});
 
 // ============================================================
 // CACHE CLEANUP
@@ -110,54 +140,18 @@ cache.startCleanup(300);
 // START SERVER
 // ============================================================
 
-app.listen(
-  PORT,
-  '0.0.0.0',
-  async () => {
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(
+    `🎵 MusicLand Backend inaendesha kwenye port ${PORT}`
+  );
 
-    console.log(
-      '=========================================='
-    );
+  console.log(
+    `🌐 PORT: ${PORT}`
+  );
 
-    console.log(
-      '🎵 MusicLand Backend'
-    );
-
-    console.log(
-      `🚀 Server inaendesha kwenye port ${PORT}`
-    );
-
-    console.log(
-      `🌍 Environment: ${
-        process.env.NODE_ENV ||
-        'development'
-      }`
-    );
-
-    console.log(
-      `📧 Gmail configured: ${
-        process.env.GMAIL_USER
-          ? 'YES'
-          : 'NO'
-      }`
-    );
-
-    console.log(
-      `🔐 JWT configured: ${
-        process.env.JWT_SECRET
-          ? 'YES'
-          : 'NO'
-      }`
-    );
-
-    console.log(
-      '=========================================='
-    );
-
-    // ========================================================
-    // TEST GMAIL SMTP
-    // ========================================================
-
-    await verifyEmailTransporter();
-  }
-);
+  console.log(
+    `🚀 Environment: ${
+      process.env.NODE_ENV || 'development'
+    }`
+  );
+});
