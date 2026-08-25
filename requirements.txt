@@ -1,2 +1,2 @@
-ytmusicapi
+ytmusicapi==1.12.2
 yt-dlp
