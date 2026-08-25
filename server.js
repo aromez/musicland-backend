@@ -3,77 +3,52 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-const musicRoutes = require('./routes/musicRoutes');
-const authRoutes = require('./routes/authRoutes');
-const cache = require('./services/cacheService');
+const musicRoutes =
+  require('./routes/musicRoutes');
+
+const authRoutes =
+  require('./routes/authRoutes');
+
+const cache =
+  require('./services/cacheService');
+
+const {
+  verifyEmailTransporter,
+} = require('./services/emailService');
 
 const app = express();
 
-// Render provides PORT through environment variables
-const PORT = process.env.PORT || 3000;
+const PORT =
+  process.env.PORT || 3000;
 
 // ============================================================
-// BASIC APP SETTINGS
+// MIDDLEWARE
 // ============================================================
 
-app.disable('x-powered-by');
+app.use(
+  cors({
+    origin: '*',
+  })
+);
 
-// ============================================================
-// CORS
-// ============================================================
-
-const corsOptions = {
-  origin: true,
-  credentials: false,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'Accept',
-    'Origin',
-    'X-Requested-With',
-  ],
-  optionsSuccessStatus: 204,
-};
-
-app.use(cors(corsOptions));
-
-// ============================================================
-// BODY PARSER
-// ============================================================
-
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
-
-// ============================================================
-// REQUEST LOGGER
-// ============================================================
-
-app.use((req, res, next) => {
-  const start = Date.now();
-
-  console.log(`[REQUEST] ${req.method} ${req.originalUrl}`);
-
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(
-      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`
-    );
-  });
-
-  next();
-});
+app.use(
+  express.json({
+    limit: '2mb',
+  })
+);
 
 // ============================================================
 // ROOT
 // ============================================================
 
 app.get('/', (req, res) => {
-  res.status(200).json({
+  res.json({
     success: true,
-    message: 'MusicLand Backend API inafanya kazi 🎵',
-    environment: process.env.NODE_ENV || 'production',
-    timestamp: new Date().toISOString(),
+    message:
+      'MusicLand Backend API inafanya kazi 🎵',
+    environment:
+      process.env.NODE_ENV ||
+      'development',
   });
 });
 
@@ -82,24 +57,13 @@ app.get('/', (req, res) => {
 // ============================================================
 
 app.get('/health', (req, res) => {
-  res.status(200).json({
+  res.json({
     success: true,
     status: 'ok',
-    service: 'musicland-backend',
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ============================================================
-// API HEALTH CHECK
-// ============================================================
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    status: 'ok',
-    service: 'musicland-backend',
-    timestamp: new Date().toISOString(),
+    service:
+      'musicland-backend',
+    time:
+      new Date().toISOString(),
   });
 });
 
@@ -107,101 +71,93 @@ app.get('/api/health', (req, res) => {
 // API ROUTES
 // ============================================================
 
-// Music routes
-app.use('/api', musicRoutes);
+app.use(
+  '/api',
+  musicRoutes
+);
 
-// Authentication routes
-app.use('/api/auth', authRoutes);
-
-// ============================================================
-// 404 HANDLER
-// ============================================================
-
-app.use((req, res) => {
-  console.log(`[404] ${req.method} ${req.originalUrl}`);
-
-  res.status(404).json({
-    success: false,
-    error: 'Route haijapatikana',
-    path: req.originalUrl,
-    method: req.method,
-    timestamp: new Date().toISOString(),
-  });
-});
+app.use(
+  '/api/auth',
+  authRoutes
+);
 
 // ============================================================
-// GLOBAL ERROR HANDLER
+// ERROR HANDLER
 // ============================================================
 
-app.use((err, req, res, next) => {
-  console.error('========================================');
-  console.error('GLOBAL SERVER ERROR');
-  console.error(err);
-  console.error('========================================');
+app.use(
+  (err, req, res, next) => {
+    console.error(
+      '❌ GLOBAL ERROR:',
+      err
+    );
 
-  if (res.headersSent) {
-    return next(err);
+    res.status(500).json({
+      success: false,
+      message:
+        'Internal server error',
+    });
   }
-
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error',
-    message: isDevelopment ? err.message : 'Server imepata hitilafu',
-    timestamp: new Date().toISOString(),
-  });
-});
+);
 
 // ============================================================
 // CACHE CLEANUP
 // ============================================================
 
-try {
-  if (cache && typeof cache.startCleanup === 'function') {
-    cache.startCleanup(300);
-    console.log('✅ Cache cleanup imeanzishwa');
-  } else {
-    console.log('⚠️ Cache service haipatikani au haina startCleanup');
-  }
-} catch (error) {
-  console.error('⚠️ Cache cleanup haikuanza:', error.message);
-}
+cache.startCleanup(300);
 
 // ============================================================
 // START SERVER
 // ============================================================
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log('========================================');
-  console.log('🎵 MusicLand Backend');
-  console.log('========================================');
-  console.log(`🚀 Server inaendesha kwenye port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'production'}`);
-  console.log(`🕐 Started: ${new Date().toISOString()}`);
-  console.log('========================================');
-});
+app.listen(
+  PORT,
+  '0.0.0.0',
+  async () => {
 
-// ============================================================
-// GRACEFUL SHUTDOWN
-// ============================================================
+    console.log(
+      '=========================================='
+    );
 
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received. Closing server...');
-  process.exit(0);
-});
+    console.log(
+      '🎵 MusicLand Backend'
+    );
 
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received. Closing server...');
-  process.exit(0);
-});
+    console.log(
+      `🚀 Server inaendesha kwenye port ${PORT}`
+    );
 
-process.on('uncaughtException', (error) => {
-  console.error('💥 Uncaught Exception:', error);
-  // Keep server running
-});
+    console.log(
+      `🌍 Environment: ${
+        process.env.NODE_ENV ||
+        'development'
+      }`
+    );
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-  // Keep server running
-});
+    console.log(
+      `📧 Gmail configured: ${
+        process.env.GMAIL_USER
+          ? 'YES'
+          : 'NO'
+      }`
+    );
+
+    console.log(
+      `🔐 JWT configured: ${
+        process.env.JWT_SECRET
+          ? 'YES'
+          : 'NO'
+      }`
+    );
+
+    console.log(
+      '=========================================='
+    );
+
+    // ========================================================
+    // TEST GMAIL SMTP
+    // ========================================================
+
+    await verifyEmailTransporter();
+  }
+);
