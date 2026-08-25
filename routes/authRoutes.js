@@ -22,23 +22,20 @@ router.post('/register', async (req, res) => {
     if (!email && !phone) {
       return res.status(400).json({
         success: false,
-        error:
-          'Email au namba ya simu inahitajika',
+        error: 'Email au namba ya simu inahitajika',
       });
     }
 
-    const result =
-      await authService.requestOtp({
-        email,
-        phone,
-      });
+    const result = await authService.requestOtp({
+      email,
+      phone,
+    });
 
     return res.status(200).json({
       success: true,
       message: 'Code imetumwa',
       contact: result.contact,
     });
-
   } catch (err) {
     console.error(
       '❌ REGISTER ERROR:',
@@ -83,7 +80,6 @@ router.post('/verify-otp', (req, res) => {
       success: true,
       ...result,
     });
-
   } catch (err) {
     console.error(
       '❌ VERIFY OTP ERROR:',
@@ -95,53 +91,6 @@ router.post('/verify-otp', (req, res) => {
       error:
         err.message ||
         'OTP si sahihi',
-    });
-  }
-});
-
-// ============================================================
-// RESEND OTP
-// ============================================================
-
-router.post('/resend-otp', async (req, res) => {
-  try {
-    const { contact } = req.body;
-
-    if (!contact) {
-      return res.status(400).json({
-        success: false,
-        error:
-          'Email au namba ya simu inahitajika',
-      });
-    }
-
-    const isEmail =
-      contact.includes('@');
-
-    const result =
-      await authService.requestOtp(
-        isEmail
-          ? { email: contact }
-          : { phone: contact }
-      );
-
-    return res.status(200).json({
-      success: true,
-      message: 'Code mpya imetumwa',
-      contact: result.contact,
-    });
-
-  } catch (err) {
-    console.error(
-      '❌ RESEND OTP ERROR:',
-      err.message
-    );
-
-    return res.status(400).json({
-      success: false,
-      error:
-        err.message ||
-        'Imeshindikana kutuma OTP',
     });
   }
 });
@@ -195,7 +144,6 @@ router.post(
         success: true,
         ...result,
       });
-
     } catch (err) {
       console.error(
         '❌ SETUP PROFILE ERROR:',
@@ -239,7 +187,6 @@ router.post('/login', (req, res) => {
       success: true,
       ...result,
     });
-
   } catch (err) {
     console.error(
       '❌ LOGIN ERROR:',
@@ -262,8 +209,7 @@ router.post('/login', (req, res) => {
 router.post('/logout', (req, res) => {
   return res.status(200).json({
     success: true,
-    message:
-      'Umetoka kikamilifu',
+    message: 'Umetoka kikamilifu',
   });
 });
 
@@ -310,7 +256,6 @@ router.get('/me', (req, res) => {
       success: true,
       user,
     });
-
   } catch (err) {
     console.error(
       '❌ GET ME ERROR:',
