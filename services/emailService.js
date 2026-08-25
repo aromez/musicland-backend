@@ -1,151 +1,142 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 20000,
-});
-
-async function verifyEmailTransporter() {
-  try {
-    await transporter.verify();
-
-    console.log('==========================================');
-    console.log('✅ Gmail SMTP connection iko tayari');
-    console.log(`📧 Gmail: ${process.env.GMAIL_USER}`);
-    console.log('==========================================');
-
-    return true;
-  } catch (error) {
-    console.error('==========================================');
-    console.error('❌ Gmail SMTP connection FAILED');
-    console.error('Error:', error.message);
-    console.error('==========================================');
-
-    return false;
-  }
+if (!RESEND_API_KEY) {
+  console.warn('⚠️ RESEND_API_KEY haijawekwa kwenye environment');
 }
 
+const resend = new Resend(RESEND_API_KEY);
+
 async function sendOtpEmail(email, code) {
-  if (!process.env.GMAIL_USER) {
+  if (!RESEND_API_KEY) {
     throw new Error(
-      'GMAIL_USER haijawekwa kwenye environment'
+      'RESEND_API_KEY haijawekwa kwenye environment'
     );
   }
 
-  if (!process.env.GMAIL_APP_PASSWORD) {
-    throw new Error(
-      'GMAIL_APP_PASSWORD haijawekwa kwenye environment'
-    );
+  if (!email) {
+    throw new Error('Email inahitajika');
+  }
+
+  if (!code) {
+    throw new Error('OTP code inahitajika');
   }
 
   const mailOptions = {
-    from: `"MusicLand" <${process.env.GMAIL_USER}>`,
-    to: email,
+    from:
+      process.env.RESEND_FROM_EMAIL ||
+      'MusicLand <onboarding@resend.dev>',
+
+    to: [email],
+
     subject: 'MusicLand - Code ya Uthibitisho',
 
     html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>MusicLand OTP</title>
-</head>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
-<body style="
-  margin:0;
-  padding:0;
-  background:#0D0D0F;
-  font-family:Arial,sans-serif;
-">
+        <title>MusicLand OTP</title>
+      </head>
 
-<div style="
-  max-width:480px;
-  margin:40px auto;
-  padding:30px;
-  background:#151518;
-  border-radius:16px;
-  color:#ffffff;
-">
+      <body style="
+        margin:0;
+        padding:0;
+        background:#0D0D0F;
+        font-family:Arial,sans-serif;
+      ">
 
-  <h2 style="
-    color:#1ED760;
-    margin-bottom:20px;
-  ">
-    MusicLand 🎵
-  </h2>
+        <div style="
+          max-width:480px;
+          margin:40px auto;
+          padding:30px;
+          background:#151518;
+          border-radius:16px;
+          color:#ffffff;
+        ">
 
-  <p>Habari,</p>
+          <h2 style="
+            color:#1ED760;
+            margin-bottom:20px;
+          ">
+            MusicLand 🎵
+          </h2>
 
-  <p>
-    Tumia code hii kuthibitisha akaunti yako:
-  </p>
+          <p>
+            Habari,
+          </p>
 
-  <div style="
-    font-size:34px;
-    font-weight:bold;
-    letter-spacing:10px;
-    color:#1ED760;
-    text-align:center;
-    margin:30px 0;
-  ">
-    ${code}
-  </div>
+          <p>
+            Tumia code hii kuthibitisha akaunti yako:
+          </p>
 
-  <p>
-    Code hii itaisha baada ya dakika
-    <strong>5</strong>.
-  </p>
+          <div style="
+            font-size:34px;
+            font-weight:bold;
+            letter-spacing:10px;
+            color:#1ED760;
+            text-align:center;
+            margin:30px 0;
+          ">
+            ${code}
+          </div>
 
-  <p style="
-    color:#999999;
-    font-size:12px;
-    margin-top:30px;
-  ">
-    Kama hukuomba code hii,
-    unaweza kupuuza email hii.
-  </p>
+          <p>
+            Code hii itaisha baada ya dakika
+            <strong>5</strong>.
+          </p>
 
-</div>
+          <p style="
+            color:#999999;
+            font-size:12px;
+            margin-top:30px;
+          ">
+            Kama hukuomba code hii, unaweza kupuuza
+            email hii.
+          </p>
 
-</body>
-</html>
+        </div>
+
+      </body>
+      </html>
     `,
   };
 
   try {
     console.log(
-      `📧 Inatuma OTP kwenda: ${email}`
+      `📧 Inatuma OTP email kwa ${email} kupitia Resend...`
     );
 
-    const info =
-      await transporter.sendMail(mailOptions);
+    const { data, error } =
+      await resend.emails.send(mailOptions);
+
+    if (error) {
+      console.error(
+        '❌ Resend API error:',
+        error
+      );
+
+      throw new Error(
+        error.message || 'Resend imeshindwa kutuma email'
+      );
+    }
 
     console.log(
       `✅ OTP email imetumwa kwa ${email}`
     );
 
     console.log(
-      `📨 Message ID: ${info.messageId}`
+      `📨 Resend Message ID: ${data?.id || 'unknown'}`
     );
 
-    return info;
+    return data;
   } catch (error) {
     console.error(
-      `❌ OTP email imeshindikana kwa ${email}`
-    );
-
-    console.error(
-      'SMTP Error:',
+      `❌ OTP email imeshindikana kwa ${email}:`,
       error.message
     );
 
@@ -157,5 +148,4 @@ async function sendOtpEmail(email, code) {
 
 module.exports = {
   sendOtpEmail,
-  verifyEmailTransporter,
 };
