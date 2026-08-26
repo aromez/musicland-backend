@@ -1,5 +1,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const pLimit = require('p-limit');
+const limit = pLimit(2); // ruhusu michakato 2 ya Python tu kwa wakati mmoja
 
 const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
 const SCRIPT_PATH = path.join(
@@ -10,115 +12,48 @@ const SCRIPT_PATH = path.join(
 );
 
 function runPythonCommand(args) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(
-      PYTHON_BIN,
-      [SCRIPT_PATH, ...args],
-      {
-        env: {
-          ...process.env,
-          PYTHONUNBUFFERED: '1',
-        },
-      }
-    );
+  return limit(() => {
+    return new Promise((resolve, reject) => {
+      const proc = spawn(PYTHON_BIN, [SCRIPT_PATH, ...args]);
 
-    let output = '';
-    let errorOutput = '';
+      let output = '';
+      let errorOutput = '';
+      let finished = false;
 
-    proc.stdout.on('data', (data) => {
-      output += data.toString();
-    });
-
-    proc.stderr.on('data', (data) => {
-      errorOutput += data.toString();
-    });
-
-    proc.on('error', (error) => {
-      reject(
-        new Error(
-          `Imeshindikana kuanzisha Python: ${error.message}`
-        )
-      );
-    });
-
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        return reject(
-          new Error(
-            `Python process ilitoka na code ${code}: ${errorOutput}`
-          )
-        );
-      }
-
-      try {
-        const parsed = JSON.parse(output);
-
-        if (parsed.error) {
-          return reject(new Error(parsed.error));
+      const timeout = setTimeout(() => {
+        if (!finished) {
+          finished = true;
+          proc.kill();
+          reject(new Error('Python process imechukua muda mrefu sana (timeout)'));
         }
+      }, 25000); // sekunde 25
 
-        resolve(parsed);
-      } catch (e) {
-        reject(
-          new Error(
-            `Imeshindikana ku-parse output ya Python: ${e.message}`
-          )
-        );
-      }
+      proc.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      proc.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeout);
+
+        if (code !== 0) {
+          return reject(new Error(`Python process ilitoka na code ${code}: ${errorOutput}`));
+        }
+        try {
+          const parsed = JSON.parse(output);
+          if (parsed.error) {
+            return reject(new Error(parsed.error));
+          }
+          resolve(parsed);
+        } catch (e) {
+          reject(new Error(`Imeshindikana ku-parse output ya Python: ${e.message}`));
+        }
+      });
     });
   });
 }
-
-async function getTrending() {
-  return runPythonCommand(['trending']);
-}
-
-async function search(query, filterType = null) {
-  const args = ['search', query];
-
-  if (filterType) {
-    args.push(filterType);
-  }
-
-  return runPythonCommand(args);
-}
-
-async function getSong(videoId) {
-  return runPythonCommand(['song', videoId]);
-}
-
-async function getWatchPlaylist(videoId) {
-  return runPythonCommand(['watch_playlist', videoId]);
-}
-
-async function getStreamUrl(videoId) {
-  return runPythonCommand(['stream', videoId]);
-}
-
-async function getArtistAlbums(artistId) {
-  return runPythonCommand(['artist_albums', artistId]);
-}
-
-async function getArtistSongs(artistId) {
-  return runPythonCommand(['artist_songs', artistId]);
-}
-
-async function getArtistDetails(artistId) {
-  return runPythonCommand(['artist_details', artistId]);
-}
-
-async function getAlbumDetails(albumId) {
-  return runPythonCommand(['album_details', albumId]);
-}
-
-module.exports = {
-  getTrending,
-  search,
-  getSong,
-  getWatchPlaylist,
-  getStreamUrl,
-  getArtistAlbums,
-  getArtistSongs,
-  getArtistDetails,
-  getAlbumDetails,
-};

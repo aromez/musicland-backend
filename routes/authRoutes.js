@@ -1,162 +1,41 @@
+// routes/authRoutes.js
 const express = require('express');
-
 const router = express.Router();
 
-const authService =
-  require('../services/authService');
+const auth = require('../services/authService');
 
 // ============================================================
-// REGISTER - REQUEST OTP
+// REGISTER - Direct registration
 // ============================================================
 
-router.post('/register', async (req, res) => {
+router.post('/register', (req, res) => {
   try {
-    const { email, phone } = req.body;
+    const { email, username, password } = req.body;
 
-    console.log('==========================================');
-    console.log('REGISTER REQUEST');
-    console.log('Email:', email);
-    console.log('Phone:', phone);
-    console.log('==========================================');
-
-    if (!email && !phone) {
+    if (!email || !username || !password) {
       return res.status(400).json({
         success: false,
-        error: 'Email au namba ya simu inahitajika',
+        error: 'Email, username na password vinahitajika'
       });
     }
 
-    const result = await authService.requestOtp({
-      email,
-      phone,
-    });
+    const result = auth.register({ email, username, password });
 
-    return res.status(200).json({
+    res.status(201).json({
       success: true,
-      message: 'Code imetumwa',
-      contact: result.contact,
+      token: result.token,
+      user: result.user,
+      message: 'Akaunti imeundwa kikamilifu'
     });
-  } catch (err) {
-    console.error(
-      '❌ REGISTER ERROR:',
-      err.message
-    );
-
-    return res.status(400).json({
+  } catch (error) {
+    console.error('❌ Registration error:', error.message);
+    
+    res.status(400).json({
       success: false,
-      error:
-        err.message ||
-        'Imeshindikana kutuma OTP',
+      error: error.message
     });
   }
 });
-
-// ============================================================
-// VERIFY OTP
-// ============================================================
-
-router.post('/verify-otp', (req, res) => {
-  try {
-    const {
-      contact,
-      code,
-    } = req.body;
-
-    if (!contact || !code) {
-      return res.status(400).json({
-        success: false,
-        error:
-          'Contact na OTP code vinahitajika',
-      });
-    }
-
-    const result =
-      authService.verifyOtp({
-        contact,
-        code,
-      });
-
-    return res.status(200).json({
-      success: true,
-      ...result,
-    });
-  } catch (err) {
-    console.error(
-      '❌ VERIFY OTP ERROR:',
-      err.message
-    );
-
-    return res.status(400).json({
-      success: false,
-      error:
-        err.message ||
-        'OTP si sahihi',
-    });
-  }
-});
-
-// ============================================================
-// SETUP PROFILE
-// ============================================================
-
-router.post(
-  '/setup-profile',
-  (req, res) => {
-    try {
-      const authorization =
-        req.headers.authorization;
-
-      if (!authorization) {
-        return res.status(401).json({
-          success: false,
-          error:
-            'Authorization token inahitajika',
-        });
-      }
-
-      const tempToken =
-        authorization.replace(
-          'Bearer ',
-          ''
-        );
-
-      const {
-        username,
-        password,
-      } = req.body;
-
-      if (!username || !password) {
-        return res.status(400).json({
-          success: false,
-          error:
-            'Username na password vinahitajika',
-        });
-      }
-
-      const result =
-        authService.setupProfile({
-          tempToken,
-          username,
-          password,
-        });
-
-      return res.status(200).json({
-        success: true,
-        ...result,
-      });
-    } catch (err) {
-      console.error(
-        '❌ SETUP PROFILE ERROR:',
-        err.message
-      );
-
-      return res.status(400).json({
-        success: false,
-        error: err.message,
-      });
-    }
-  }
-);
 
 // ============================================================
 // LOGIN
@@ -164,108 +43,139 @@ router.post(
 
 router.post('/login', (req, res) => {
   try {
-    const {
-      identifier,
-      password,
-    } = req.body;
+    const { email, password } = req.body;
 
-    if (!identifier || !password) {
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        error:
-          'Email/namba na password vinahitajika',
+        error: 'Email na password vinahitajika'
       });
     }
 
-    const result =
-      authService.login({
-        identifier,
-        password,
-      });
+    const result = auth.login({ email, password });
 
-    return res.status(200).json({
+    res.json({
       success: true,
-      ...result,
+      token: result.token,
+      user: result.user,
+      message: 'Logged in successfully'
     });
-  } catch (err) {
-    console.error(
-      '❌ LOGIN ERROR:',
-      err.message
-    );
-
-    return res.status(401).json({
+  } catch (error) {
+    console.error('❌ Login error:', error.message);
+    
+    res.status(400).json({
       success: false,
-      error:
-        err.message ||
-        'Login imeshindikana',
+      error: error.message
     });
   }
 });
 
 // ============================================================
-// LOGOUT
-// ============================================================
-
-router.post('/logout', (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: 'Umetoka kikamilifu',
-  });
-});
-
-// ============================================================
-// CURRENT USER
+// GET CURRENT USER
 // ============================================================
 
 router.get('/me', (req, res) => {
   try {
-    const authorization =
-      req.headers.authorization;
+    const authHeader = req.headers.authorization;
 
-    if (!authorization) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        error:
-          'Authorization token inahitajika',
+        error: 'Authorization token inahitajika'
       });
     }
 
-    const token =
-      authorization.replace(
-        'Bearer ',
-        ''
-      );
-
-    const decoded =
-      authService.verifyToken(token);
-
-    const user =
-      authService.getUserById(
-        decoded.userId
-      );
+    const token = authHeader.split(' ')[1];
+    const decoded = auth.verifyToken(token);
+    
+    const user = auth.getUserById(decoded.userId);
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        error:
-          'User hajapatikana',
+        error: 'User haipatikani'
       });
     }
 
-    return res.status(200).json({
+    res.json({
+      success: true,
+      user
+    });
+  } catch (error) {
+    console.error('❌ Get user error:', error.message);
+    
+    res.status(401).json({
+      success: false,
+      error: error.message || 'Token si sahihi au imeisha muda'
+    });
+  }
+});
+
+// ============================================================
+// UPDATE USER
+// ============================================================
+
+router.put('/me', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authorization token inahitajika'
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = auth.verifyToken(token);
+    
+    const { username, avatarUrl } = req.body;
+    
+    const user = auth.updateUser(decoded.userId, { username, avatarUrl });
+
+    res.json({
       success: true,
       user,
+      message: 'User updated successfully'
     });
-  } catch (err) {
-    console.error(
-      '❌ GET ME ERROR:',
-      err.message
-    );
-
-    return res.status(401).json({
+  } catch (error) {
+    console.error('❌ Update user error:', error.message);
+    
+    res.status(400).json({
       success: false,
-      error:
-        'Token si sahihi au imeisha muda',
+      error: error.message
+    });
+  }
+});
+
+// ============================================================
+// CHECK EMAIL AVAILABILITY
+// ============================================================
+
+router.post('/check-email', (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email inahitajika'
+      });
+    }
+
+    const user = auth.getUserByEmail(email);
+
+    res.json({
+      success: true,
+      available: !user,
+      message: user ? 'Email tayari imesajiliwa' : 'Email inapatikana'
+    });
+  } catch (error) {
+    console.error('❌ Check email error:', error.message);
+    
+    res.status(400).json({
+      success: false,
+      error: error.message
     });
   }
 });

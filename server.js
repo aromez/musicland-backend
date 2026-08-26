@@ -1,3 +1,4 @@
+// server.js
 require('dotenv').config();
 
 const express = require('express');
@@ -18,7 +19,6 @@ app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-  optionsSuccessStatus: 204,
 }));
 
 // ============================================================
@@ -51,7 +51,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'MusicLand Backend API inafanya kazi 🎵',
+    message: 'MusicLand Backend API 🎵',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
   });
@@ -70,29 +70,20 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ============================================================
-// API HEALTH
-// ============================================================
-
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
     status: 'ok',
-    service: 'musicland-backend',
+    service: 'musicland-backend-api',
     timestamp: new Date().toISOString(),
   });
 });
 
 // ============================================================
-// MUSIC ROUTES
+// ROUTES
 // ============================================================
 
 app.use('/api', musicRoutes);
-
-// ============================================================
-// AUTH ROUTES
-// ============================================================
-
 app.use('/api/auth', authRoutes);
 
 // ============================================================
@@ -106,30 +97,24 @@ app.use((req, res) => {
     success: false,
     error: 'Route haijapatikana',
     path: req.originalUrl,
-    method: req.method,
   });
 });
 
 // ============================================================
-// GLOBAL ERROR HANDLER
+// ERROR HANDLER
 // ============================================================
 
 app.use((err, req, res, next) => {
-  console.error('========================================');
-  console.error('❌ GLOBAL SERVER ERROR');
-  console.error(err);
-  console.error('========================================');
+  console.error('❌ Error:', err);
 
   if (res.headersSent) {
     return next(err);
   }
 
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
   res.status(500).json({
     success: false,
     error: 'Internal server error',
-    message: isDevelopment ? err.message : 'Server imepata hitilafu',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
   });
 });
 
@@ -141,11 +126,9 @@ try {
   if (cache && typeof cache.startCleanup === 'function') {
     cache.startCleanup(300);
     console.log('✅ Cache cleanup imeanzishwa');
-  } else {
-    console.log('⚠️ Cache service haipatikani');
   }
 } catch (error) {
-  console.error('⚠️ Cache cleanup haikuanza:', error.message);
+  console.error('⚠️ Cache cleanup error:', error.message);
 }
 
 // ============================================================
@@ -156,35 +139,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('========================================');
   console.log('🎵 MusicLand Backend');
   console.log('========================================');
-  console.log(`🚀 Server inaendesha kwenye port ${PORT}`);
+  console.log(`🚀 Port: ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔓 Email Service: DISABLED`);
-  console.log(`🔑 JWT Secret: ${process.env.JWT_SECRET ? '✅ SET' : '❌ NOT SET'}`);
+  console.log(`🔑 JWT: ${process.env.JWT_SECRET ? '✅' : '❌'}`);
   console.log(`🕐 Started: ${new Date().toISOString()}`);
   console.log('========================================');
-  console.log('💡 OTP Codes will be shown in console');
-  console.log('💡 Check logs for OTP code');
-  console.log('========================================');
-});
-
-// ============================================================
-// GRACEFUL SHUTDOWN
-// ============================================================
-
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received. Closing server...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received. Closing server...');
-  process.exit(0);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('💥 Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Unhandled Rejection:', reason);
 });

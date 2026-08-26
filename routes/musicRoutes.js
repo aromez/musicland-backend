@@ -63,7 +63,7 @@ function shuffleArray(array) {
   return arr;
 }
 
-function getSeedArtistsForGenre(genre, count = 6) {
+function getSeedArtistsForGenre(genre, count = 3) {
   const pool = GENRE_SEED_ARTISTS[genre] || GENRE_SEED_ARTISTS.all;
   return shuffleArray(pool).slice(0, Math.min(count, pool.length));
 }
@@ -232,7 +232,7 @@ router.get('/artists/popular', async (req, res) => {
     let artists = cache.get(cacheKey);
 
     if (!artists) {
-      const seedNames = getSeedArtistsForGenre('all', 10);
+      const seedNames = getSeedArtistsForGenre('all', 5);
       const results = await Promise.all(
         seedNames.map(async (name) => {
           try {
